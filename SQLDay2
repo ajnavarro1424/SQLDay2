@@ -1,0 +1,207 @@
+-- What languages are spoken in the United States? (12) Brazil? (not Spanish...) Switzerland? (6)
+select distinct cl.language, c.name
+
+from country c join
+countrylanguage cl ON (cl.countrycode = 'USA')
+
+where c.name = 'United States'
+
+select distinct cl.language, c.name
+
+from country c join
+countrylanguage cl ON (cl.countrycode = 'BRA')
+
+where c.name = 'Brazil'
+
+select distinct cl.language, c.name
+
+from country c join
+countrylanguage cl ON (cl.countrycode = 'CHE')
+
+where c.name = 'Switzerland'
+
+-- What are the cities of the US? (274) India? (341)
+select cs.name, c.name
+
+from country c join
+city cs on (cs.countrycode = 'USA')
+where c.name = 'United States'
+
+select cs.name, c.name
+
+from country c join
+city cs on (cs.countrycode = 'IND')
+where c.name = 'India'
+
+-- Which country or contries speak the most languages? (12 languages)
+select c.name, count(cl.language) as lang_count
+
+from country c join
+countrylanguage cl on (c.code = cl.countrycode)
+group by c.name
+order by lang_count desc
+
+-- Which country or contries have the most offficial languages? (4 languages)
+-- Hint: Use GROUP BY and ORDER BY
+select c.name, count(cl.language) as lang_count
+
+from country c join
+countrylanguage cl on (c.code = cl.countrycode)
+where cl.isofficial
+group by c.name
+order by lang_count desc
+
+-- Which languages are spoken in the ten largest (area) countries?
+-- Hint: Use WITH to get the countries and join with that table
+with largest as (
+select name, surfacearea, code
+from country
+order by surfacearea desc
+limit 10)
+
+select l.name, cl.language
+from largest l join
+countrylanguage cl on (l.code = cl.countrycode)
+order by l.name
+
+-- What languages are spoken in the 20 poorest (GNP/ capita) countries in the world? (94 with GNP > 0)
+-- Hint: Use WITH to get the countries, and SELECT DISTINCT to remove duplicates
+with poorest as (
+select name, code, gnp/population as gnpcap
+from country
+where population > 0
+and
+gnp > 0
+order by gnpcap asc
+limit 20
+)
+
+select distinct cl.language, p.name as countryname, p.gnpcap
+from poorest p join countrylanguage cl on (p.code = cl.countrycode)
+order by gnpcap asc
+
+-- Are there any countries without an official language?
+-- Hint: Use NOT IN with a SELECT
+select c.name, count( case when cl.isofficial then 1 end) as true_count
+from countrylanguage cl join
+country c on (c.code = cl.countrycode)
+group by c.name
+having count( case when cl.isofficial then 1 end) = 0
+
+-- What are the languages spoken in the countries with no official language? (49 countries, 172 languages, incl. English)
+with no_official as (
+select cl.countrycode, count( case when cl.isofficial then 1 end) as true_count
+from countrylanguage cl
+group by cl.countrycode
+having count( case when cl.isofficial then 1 end) = 0
+)
+
+select c.name, cl.language, cl.countrycode
+from no_official no_off join
+country c on (c.code = no_off.countrycode) join
+countrylanguage cl on (cl.countrycode = no_off.countrycode)
+order by c.name asc
+
+-- Which countries have the highest proportion of official language speakers? The lowest?
+select c.name, countrycode, language, percentage
+from countrylanguage join
+country c on (c.code = countrycode)
+where isofficial=True
+order by percentage desc / asc
+
+-- What is the most spoken language in the world?
+select cl.language, sum(cl.percentage*c.population)
+from countrylanguage cl join
+country c on (c.code = countrycode)
+group by cl.language
+order by sum desc
+
+-- What is the population of the United States? What is the city population of the United States?
+
+select c.population as tot_USA_pop, sum(cs.population) as tot_city_pop
+from city cs join
+country c on (c.code = 'USA')
+where countrycode = 'USA'
+group by c.population
+
+-- What is the population of the India? What is the city population of the India?
+select c.population as tot_IND_pop, sum(cs.population) as tot_city_pop
+from city cs join
+country c on (c.code = 'IND')
+where cs.countrycode = 'IND'
+group by c.population
+
+-- Which countries have no cities? (7 not really contries...)
+select distinct c2.name
+from country c2, city
+	where c2.name not in (
+	select c.name
+	from city cs join
+	country c on (c.code = cs.countrycode)
+)
+
+-- What is the total population of cities where English is the offical language? Spanish?
+with eng_city_pop as (
+select distinct c.name, sum(cs.population) as eng_city_pop_sum
+from country c join
+city cs on (c.code = cs.countrycode) join
+countrylanguage cl on (c.code = cl.countrycode)
+where cl.language = 'English' and cl.isofficial
+group by c.name
+)
+
+select sum(eng_city_pop_sum) as tot_eng_city_pop_sum
+from eng_city_pop
+
+
+with spn_city_pop as (
+select distinct c.name, sum(cs.population) as spn_city_pop_sum
+from country c join
+city cs on (c.code = cs.countrycode) join
+countrylanguage cl on (c.code = cl.countrycode)
+where cl.language = 'Spanish' and cl.isofficial
+group by c.name
+)
+
+select sum(spn_city_pop_sum) as tot_spn_city_pop_sum
+from spn_city_pop
+
+-- Which countries have the 100 biggest cities in the world?
+with biggest_cities as (
+select c.name as country_name, cs.name as city_name, cs.population
+from city cs join
+country c on (cs.countrycode = c.code)
+order by cs.population desc
+limit 100
+)
+select country_name, city_name, population
+from biggest_cities bc
+
+-- What languages are spoken in the countries with the 100 biggest cities in the world?
+with biggest_cities as (
+select c.name as country_name, cs.name as city_name, cs.population as city_population , c.code as country_code
+from city cs join
+country c on (cs.countrycode = c.code)
+order by cs.population desc
+limit 100
+)
+
+
+select cl.language, country_name, city_name, city_population
+from biggest_cities join
+countrylanguage cl on(country_code = cl.countrycode)
+order by city_population desc
+
+-- DVD Rental Database
+-- Which customer placed the orders on the earliest date? What did they order?
+-- Unfinished!!
+
+with earliest_rental as (
+select rental_date, customer_id
+from rentals
+order by rental_date
+limit 1
+)
+
+select cust.first_name, cust.last_name, rent.customer_id, cust.customer_id
+from earliest_rental rent join customers cust on (rent.customer_id = cust.customer_id)
